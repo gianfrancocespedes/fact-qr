@@ -1,0 +1,19 @@
+# Todo lo listado aquí queda fuera del contexto que se envía al daemon de Docker.
+
+# Binarios compilados en el anfitrión: la imagen compila los suyos, y uno de Windows no
+# funcionaría dentro del contenedor Linux.
+server
+server.exe
+bin/
+
+*.out
+*.test
+
+.env
+.env.*
+!.env.example
+
+.git
+.gitignore
+Dockerfile
+.dockerignore

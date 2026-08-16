@@ -1,0 +1,39 @@
+# Variables de entorno: contienen el secreto JWT, nunca se versionan.
+# El archivo .env.example sí se versiona como plantilla documentada.
+.env
+.env.local
+.env.*.local
+
+# --- Go ---
+# Binarios compilados de la qr-api
+qr-api/server
+qr-api/server.exe
+qr-api/bin/
+# Reportes de cobertura
+*.out
+*.test
+
+# --- Node ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm/
+
+# --- Frontend (Vite) ---
+web/dist/
+web/.vite/
+web/coverage/
+stats-api/coverage/
+
+# --- Editores e IDEs ---
+.vscode/
+.idea/
+CLAUDE.md
+*.swp
+
+# --- Sistema operativo ---
+# Windows es el entorno de desarrollo; el resto se incluye por si el repo se clona en otro SO.
+Thumbs.db
+Desktop.ini
+.DS_Store

@@ -1,0 +1,60 @@
+@import 'tailwindcss';
+
+/*
+ * Paleta y tipografía del lenguaje visual, tomadas de `qr-householder.html`.
+ *
+ * Declararlas con @theme las convierte en utilidades de Tailwind (text-ink, bg-card,
+ * border-line...), lo que evita repartir valores hexadecimales por el JSX y mantiene el
+ * significado a la vista: se escribe `text-ortho`, no `text-[#0B7A6E]`.
+ *
+ * El color es semántico, no decorativo: Q siempre verde, R siempre ámbar, los ceros
+ * siempre grises. Así se distinguen las matrices sin leer las etiquetas.
+ */
+@theme {
+    --color-ink: #0f1b2d;
+    --color-ink-soft: #4a5a72;
+    --color-paper: #e9eef5;
+    --color-card: #ffffff;
+    --color-line: #c6d0de;
+    --color-vector: #1d4ed8;
+    --color-mirror: #c81e6b;
+    --color-ortho: #0b7a6e;
+    --color-upper: #a85a05;
+    --color-zero: #9aa8bc;
+
+    /* Fondos suaves derivados, para resaltados y estados. */
+    --color-vector-soft: #dde7ff;
+    --color-mirror-soft: #fce4ef;
+    --color-ortho-soft: #dcf2ec;
+    --color-surface: #f7f9fc;
+    --color-hover: #e2e9f3;
+
+    --font-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif;
+    --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+}
+
+body {
+    margin: 0;
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-serif);
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* El foco debe ser visible siempre: es la única guía de quien navega con teclado. */
+:focus-visible {
+    outline: 2px solid var(--color-vector);
+    outline-offset: 2px;
+}
+
+/* Respeta a quien configuró su sistema para reducir el movimiento. */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        transition: none !important;
+        animation: none !important;
+    }
+}

@@ -1,0 +1,80 @@
+# Levanta el sistema completo en local con un solo comando:
+#
+#   cp .env.example .env      (o `copy` en Windows)
+#   docker compose up --build
+#
+# Railway no usa este archivo —despliega cada servicio desde su propio Dockerfile—, pero se
+# versiona igualmente: es lo que permite a cualquiera clonar el repositorio y ejecutar todo
+# sin instalar Go ni Node. Ambos entornos comparten los mismos Dockerfiles y solo cambian las
+# variables de entorno.
+
+services:
+    stats-api:
+        build:
+            context: ./stats-api
+        environment:
+            STATS_API_PORT: 3000
+            # Debe coincidir con el de la qr-api: aquella emite los tokens y esta los verifica.
+            # `:?` aborta con este mensaje si la variable falta, en vez de arrancar con una
+            # clave por defecto: el secreto no tiene valor de respaldo en ningún entorno.
+            JWT_SECRET: ${JWT_SECRET:?falta JWT_SECRET; copia .env.example a .env}
+            DIAGONAL_EPSILON: ${DIAGONAL_EPSILON:-1e-9}
+            # El frontend llama a esta API directamente desde el navegador con el segundo botón,
+            # así que necesita su propio CORS además del de la qr-api.
+            CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+        ports:
+            # Se publica al anfitrión porque el navegador la llama directamente, no solo la qr-api.
+            - "3000:3000"
+        healthcheck:
+            test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 5s
+        restart: unless-stopped
+
+    qr-api:
+        build:
+            context: ./qr-api
+        environment:
+            QR_API_PORT: 8080
+            # `stats-api` es el nombre del servicio en la red de Compose, no una IP ni localhost:
+            # dentro del contenedor, localhost sería el propio contenedor de Go. En Railway esta
+            # misma variable apunta a `http://stats-api.railway.internal:3000`.
+            STATS_API_URL: http://stats-api:3000
+            STATS_API_TIMEOUT: ${STATS_API_TIMEOUT:-60s}
+            JWT_SECRET: ${JWT_SECRET:?falta JWT_SECRET; copia .env.example a .env}
+            JWT_EXPIRATION: ${JWT_EXPIRATION:-1h}
+            CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+        ports:
+            - "8080:8080"
+        depends_on:
+            stats-api:
+                # Esperar a que esté *sana*, no solo iniciada: sin esto, la qr-api podría atender
+                # peticiones antes de que su dependencia acepte conexiones.
+                condition: service_healthy
+        healthcheck:
+            test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 5s
+        restart: unless-stopped
+
+    web:
+        build:
+            context: ./web
+            # Vite incrusta estas variables durante el build, no al arrancar: por eso son args de
+            # construcción. Cambiarlas exige reconstruir la imagen, no basta con reiniciar.
+            args:
+                VITE_QR_API_URL: ${VITE_QR_API_URL:-http://localhost:8080}
+                VITE_STATS_API_URL: ${VITE_STATS_API_URL:-http://localhost:3000}
+        ports:
+            # 5173 en el anfitrión para conservar la misma URL que en desarrollo con Vite.
+            - "5173:8080"
+        depends_on:
+            - qr-api
+        restart: unless-stopped
+
+# Compose crea una red por defecto donde los servicios se resuelven por nombre; no hace falta
+# declararla explícitamente.

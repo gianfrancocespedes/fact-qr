@@ -1,0 +1,17 @@
+# Todo lo listado aquí queda fuera del contexto que se envía al daemon de Docker.
+
+node_modules
+coverage
+
+# Las pruebas no forman parte de la imagen de producción: se ejecutan en el desarrollo y en
+# la integración continua, no dentro del contenedor desplegado.
+tests
+
+.env
+.env.*
+!.env.example
+
+.git
+.gitignore
+Dockerfile
+.dockerignore

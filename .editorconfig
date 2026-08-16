@@ -1,0 +1,27 @@
+# Estándar de formato del repositorio. Lo respetan VS Code, GoLand, Vim y la mayoría de
+# editores modernos, así que el estilo no depende de la configuración personal de cada uno.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# Go se indenta con tabulaciones por decisión del lenguaje: es lo que impone `gofmt`, y
+# discutirlo no tiene sentido porque la herramienta reescribe el archivo de todos modos.
+[*.go]
+indent_style = tab
+
+# En Markdown la sangría es significativa: dos espacios es el nivel de anidamiento que
+# esperan las listas, y cuatro convertiría un sub-ítem en bloque de código.
+[*.md]
+indent_size = 2
+trim_trailing_whitespace = false
+
+# Los archivos de bloqueo los genera npm con su propio formato; reindentarlos produciría
+# un diff enorme en cada instalación.
+[package-lock.json]
+indent_size = 2

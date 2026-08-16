@@ -1,0 +1,22 @@
+# Todo lo listado aquí queda fuera del contexto que se envía al daemon de Docker.
+# Importa por dos razones: velocidad (node_modules son miles de archivos) y seguridad
+# (un .env con secretos no debe acabar dentro de una imagen).
+
+node_modules
+dist
+.vite
+
+# Las variables reales nunca entran en la imagen; las URLs llegan como ARG en el build.
+.env
+.env.*
+!.env.example
+
+.git
+.gitignore
+Dockerfile
+.dockerignore
+README.md
+
+# Artefactos de las pruebas con navegador
+.playwright-cli
+*.png
