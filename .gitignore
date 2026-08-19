@@ -30,6 +30,7 @@ stats-api/coverage/
 .vscode/
 .idea/
 CLAUDE.md
+guia-proyecto.html
 *.swp
 
 # --- Sistema operativo ---

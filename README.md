@@ -1,11 +1,10 @@
 # Coding Challenge — Interseguro
 
-Solución al reto técnico de la División TI: dos APIs que se comunican por HTTP para calcular la
-**factorización QR** de una matriz rectangular y obtener estadísticas sobre las matrices
-resultantes.
+Dos APIs que se comunican por HTTP para calcular la **factorización QR** de una matriz rectangular
+y obtener estadísticas sobre las matrices resultantes, con una interfaz web que consume ambas.
 
-Se implementan los tres requisitos obligatorios y los **tres opcionales** (frontend, JWT y
-pruebas).
+El sistema está contenerizado, protegido con JWT y cubierto por pruebas unitarias y de integración
+en las dos APIs.
 
 ---
 
@@ -33,9 +32,8 @@ pruebas).
                     └──────────────────────────────────────┘
 ```
 
-La **qr-api orquesta**, tal como indican los requisitos: recibe la matriz, la rota si se solicita,
-calcula la factorización QR por reflexiones de Householder, envía **Q y R** a la stats-api y
-compone la respuesta final.
+La **qr-api orquesta** el flujo: recibe la matriz, la rota si se solicita, calcula la factorización
+QR por reflexiones de Householder, envía **Q y R** a la stats-api y compone la respuesta final.
 
 El frontend consume **ambas APIs**: la qr-api para el flujo completo y la stats-api directamente
 para calcular estadísticas de la matriz ingresada sin factorizarla.
@@ -61,7 +59,7 @@ para calcular estadísticas de la matriz ingresada sin factorizarla.
 
 ```bash
 git clone <url-del-repositorio>
-cd coding-challenge-interseguro
+cd <carpeta-del-repositorio>
 
 cp .env.example .env          # copy .env.example .env  en Windows
 docker compose up --build
@@ -135,103 +133,12 @@ máquina incluso en matrices mal condicionadas.
 
 ---
 
-## Fundamento matemático y referencias
-
-El algoritmo no es original: la factorización QR por reflexiones de Householder es un método
-estándar del álgebra lineal numérica, publicado en 1958 y usado desde entonces por todas las
-bibliotecas serias de cálculo matricial. Lo que sigue documenta **de dónde proviene cada decisión**
-y qué se verificó antes de implementarla.
-
-### El método
-
-Una reflexión de Householder es la matriz `H = I − 2vvᵀ`, con `‖v‖ = 1`. Geométricamente refleja
-cualquier vector respecto al hiperplano perpendicular a `v`. Dos propiedades la hacen útil aquí:
-
-1. **Es ortogonal y simétrica** (`H = Hᵀ = H⁻¹`), así que conserva las normas: es una isometría.
-2. **Con el `v` adecuado, lleva un vector sobre el primer eje**, anulando de una sola vez todos sus
-   componentes restantes.
-
-El algoritmo aplica esas reflexiones columna por columna. Tras `min(n, m−1)` pasos, `A` ha quedado
-triangular superior —esa es `R`— y el producto acumulado de las reflexiones es `Q`.
-
-La clave de estabilidad está en el signo. Para la subcolumna `x` se elige:
-
-```
-α = −sign(x₁)·‖x‖        v = x − α·e₁
-```
-
-El signo **opuesto** al del pivote no es una convención arbitraria: con el mismo signo, `v₁` sería
-`x₁ − ‖x‖`, la resta de dos números casi iguales cuando la columna ya está casi alineada. Eso es
-**cancelación catastrófica** — los dígitos significativos se anulan y queda mayormente error de
-redondeo, que al normalizar se amplifica. Con el signo opuesto las magnitudes se suman.
-Implementado en [householder.go:71](qr-api/internal/matrix/householder.go#L71).
-
-### Fuentes
-
-Documentación de acceso libre consultada durante la implementación:
-
-| Fuente | Qué se tomó de aquí |
-|---|---|
-| [LAPACK Users' Guide](https://www.netlib.org/lapack/lug/node40.html) — rutinas `xGEQRF` / `xORGQR` | La separación entre calcular los reflectores y materializar `Q`, y la confirmación de que es el método estándar de la industria |
-| [Documentación de `numpy.linalg.qr`](https://numpy.org/doc/stable/reference/generated/numpy.linalg.qr.html) | La referencia contra la que se validó numéricamente; también el origen de la distinción `reduced` / `complete` |
-
-El método de Householder es material estándar de álgebra lineal numérica —publicado en 1958 y
-descrito en cualquier texto de la disciplina—, así que las propiedades que se citan abajo son
-conocimiento establecido, no un resultado propio. La verificación que **sí** hizo este proyecto es
-empírica: la salida se contrastó contra `numpy.linalg.qr`, y las pruebas comprueban las
-propiedades que definen la factorización (`QᵀQ = I`, `QR = A`, `R` triangular superior).
-
-### Por qué Householder y no las alternativas
-
-La comparación se resolvió sobre un criterio: **estabilidad numérica**.
-
-| | Gram-Schmidt clásico | GS modificado | Givens | **Householder** |
-|---|---|---|---|---|
-| Ortogonalidad de Q | Se pierde ∝ κ(A)² | Se pierde ∝ κ(A) | Preservada | **Preservada** |
-| Costo (denso) | ≈ 2mn² | ≈ 2mn² | ≈ 50 % más | **2mn² − 2n³/3** |
-| Mejor caso de uso | Didáctico | Métodos iterativos | Matrices dispersas | **Denso, propósito general** |
-
-Gram-Schmidt resta a cada columna su proyección sobre las anteriores; cuando dos columnas apuntan
-casi en la misma dirección esa resta cancela, y la ortogonalidad de `Q` se degrada de forma
-proporcional al **cuadrado** del número de condición. Householder no puede sufrir
-ese problema: cada reflexión es ortogonal por construcción, y el producto de matrices ortogonales
-sigue siendo ortogonal, con independencia del redondeo.
-
-Givens es igualmente estable, pero hace más trabajo sobre matrices densas. Gana cuando hay que
-anular elementos aislados —matrices dispersas o casi triangulares—, que no es el caso de esta API.
-
-### Verificación contra la referencia de la industria
-
-Afirmar que el método es estable no basta: se contrastó la implementación en Go contra
-`numpy.linalg.qr` (que llama a `dgeqrf`/`dorgqr` de LAPACK) midiendo tres residuos.
-
-```
-caso   ‖QR − A‖         ‖QᵀQ − I‖       |R| vs. LAPACK
-2x3    3.11e-15         4.44e-16        1.78e-15
-3x2    2.13e-14         1.22e-15        1.07e-14
-3x3    8.88e-16         4.44e-16        4.00e-15
-ill    3.33e-16         5.55e-16        2.71e-20
-```
-
-Todos los residuos están en el orden del épsilon de máquina (`2.22e-16`), incluida la matriz
-deliberadamente mal condicionada (`ill`). El caso `3×2` reproduce el ejemplo canónico de la
-literatura: para `A = [[12,−51],[6,167],[−4,24]]`, `R = [[−14,−21],[0,−175],[0,0]]`.
-
-> La comparación es de **valores absolutos** por una razón matemática: la factorización QR no es
-> única. Multiplicar una columna de `Q` y la fila correspondiente de `R` por `−1` produce otra
-> factorización igual de válida, y LAPACK elige los signos según su propio criterio interno. Por
-> eso las pruebas verifican **propiedades** (`QR ≈ A`, `QᵀQ ≈ I`, `R` triangular) y no valores
-> literales.
-
----
-
 ## Documentación
 
 | Documento | Contenido |
 |---|---|
 | [docs/api.md](docs/api.md) | Contratos completos, ejemplos `curl` y catálogo de errores |
-| [docs/decisions.md](docs/decisions.md) | Las 11 decisiones técnicas y su sustento |
-| [Fundamento matemático](#fundamento-matemático-y-referencias) | Bibliografía del algoritmo QR y verificación contra LAPACK |
+| [docs/decisions.md](docs/decisions.md) | Las decisiones técnicas y su sustento |
 
 ---
 
@@ -240,17 +147,14 @@ literatura: para `A = [[12,−51],[6,167],[−4,24]]`, `R = [[−14,−21],[0,�
 Están desarrolladas en [docs/decisions.md](docs/decisions.md); estas son las tres que más
 condicionan la solución.
 
-**La ambigüedad de la especificación se resuelve satisfaciendo ambas lecturas.** La descripción de
-arquitectura habla de *rotación* y la funcionalidad requerida pide *factorización QR*. En lugar de
-descartar una, el pipeline las
-encadena: `rotación → QR`. Como el valor por defecto es 0 rotaciones, el comportamiento base es
-exactamente la factorización QR de la matriz original.
-
 **Householder en lugar de Gram-Schmidt.** Es el método que usan LAPACK, NumPy y MATLAB. Cada
 reflexión es ortogonal por construcción, así que el redondeo no degrada la ortogonalidad de Q;
-Gram-Schmidt clásico la pierde de forma proporcional a κ² por cancelación catastrófica. Las fuentes
-consultadas y la verificación numérica están en
-[Fundamento matemático](#fundamento-matemático-y-referencias).
+Gram-Schmidt clásico la pierde de forma proporcional a κ² por cancelación catastrófica.
+
+**La rotación es un parámetro, no un paso obligatorio.** El pipeline encadena `rotación → QR`, con
+`rotations` por defecto en 0: sin ese parámetro, el comportamiento es la factorización QR de la
+matriz tal como llegó. El rango 0–3 cubre el espacio completo de rotaciones distintas, porque girar
+cuatro veces devuelve la matriz original.
 
 **El backend devuelve códigos de error, no texto.** `ERROR_INVALID_NUMBER` con
 `details: { row, column }` permite al frontend redactar *"El valor de la fila 2, columna 3 no es un
